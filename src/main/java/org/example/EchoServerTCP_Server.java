@@ -16,6 +16,7 @@ import org.example.entity.Usuario;
 import java.io.*;
 import java.net.*;
 import java.security.Key;
+import java.util.ArrayList;
 import java.util.Date;
 //erro de tamanho da senha
 //deslogar usuario ao excluilo
@@ -82,12 +83,12 @@ public class EchoServerTCP_Server {
                         continue;
                     }
 
-                    if (!requisicaoJson.has("operacao")) {
-                        sendResponse(os, "400", "O campo 'operacao' e obrigatorio.", null);
+                    String operacao = requisicaoJson.get("operacao").getAsString();
+
+                    if (!checarOperacao(operacao) || !requisicaoJson.has("operacao")) {
+                        sendResponse(os, "400", "Erro: Operação não encontrada ou inválida" + operacao, null);
                         continue;
                     }
-
-                    String operacao = requisicaoJson.get("operacao").getAsString();
 
                     switch (operacao) {
                         case "CRIAR_USUARIO":
@@ -115,6 +116,7 @@ public class EchoServerTCP_Server {
                         case "LOGOUT":
                             handleLogout(requisicaoJson, os);
                             System.out.println("Cliente desconectou (solicitou LOGOUT ou conexao foi perdida).");
+                            keepConnectionAlive = false;
                             break;
 
                         default:
@@ -137,10 +139,20 @@ public class EchoServerTCP_Server {
         }
     }
 
+    private static boolean checarOperacao (String operacao){
+        ArrayList<String> operacoes = new ArrayList<String>();
+        operacoes.add("CRIAR_USUARIO");
+        operacoes.add("LOGIN");
+        operacoes.add("LOGOUT");
+        operacoes.add("LISTAR_PROPRIO_USUARIO");
+        operacoes.add("EDITAR_PROPRIO_USUARIO");
+        operacoes.add("EXCLUIR_PROPRIO_USUARIO");
+        return operacoes.contains(operacao);
+    }
 
     private static void handleCreateUser(JsonObject req, PrintStream os) {
         if (!req.has("usuario") || !req.get("usuario").isJsonObject() || !req.getAsJsonObject("usuario").has("nome") || !req.getAsJsonObject("usuario").has("senha")) {
-            sendResponse(os, "400", "Para criar usuario, o objeto usuario com nome e senha e obrigatorio", null);
+            sendResponse(os, "405", "Erro: Campos inválidos, verifique o tipo e quantidade de caracteres e o objeto usuario", null);
             return;
         }
         String nome = req.getAsJsonObject("usuario").get("nome").getAsString();
@@ -199,16 +211,17 @@ public class EchoServerTCP_Server {
         JsonObject resposta = new JsonObject();
         resposta.addProperty("status", "200");
         resposta.addProperty("usuario", nomeUsuario);
-
+        resposta.addProperty("mensagem", "Sucesso: operação realizada com sucesso");
         String jsonParaEnviar = gson.toJson(resposta);
         System.out.println("[SERVIDOR -> CLIENTE]");
         System.out.println(jsonParaEnviar);
         os.println(jsonParaEnviar);
+
     }
 
     private static void handleLogin(JsonObject req, PrintStream os) {
         if (!req.has("usuario") || !req.has("senha")) {
-            sendResponse(os, "400", "Os campos 'usuario' e 'senha' sao obrigatorios.", null);
+            sendResponse(os, "422", "Erro: Chaves faltantes ou invalidas", null);
             return;
         }
         String nome = req.get("usuario").getAsString();
@@ -225,7 +238,7 @@ public class EchoServerTCP_Server {
                 return;
             }
             String token = gerarTokenJWT(user);
-            sendResponse(os, "200", null, token);
+            sendResponse(os, "200", "usuario logado", token);
         } catch (NoResultException e) {
             sendResponse(os, "401", "Credenciais invalidas.", null);
         } finally {
@@ -235,7 +248,7 @@ public class EchoServerTCP_Server {
 
     private static void handleLogout(JsonObject req, PrintStream os) {
         if (!req.has("token")) {
-            sendResponse(os, "400", "O campo 'token' e obrigatorio.", null);
+            sendResponse(os, "422", "O campo 'token' e obrigatorio.", null);
             return;
         }
         if (validarTokenEObterNomeUsuario(req.get("token").getAsString()) != null) {
@@ -247,7 +260,7 @@ public class EchoServerTCP_Server {
 
     private static void handleEditUser(JsonObject req, PrintStream os) {
         if (!req.has("token") || !req.has("usuario") || !req.getAsJsonObject("usuario").has("senha")) {
-            sendResponse(os, "400", "Os campos 'token' e 'usuario' com 'senha' são obrigatorios.", null);
+            sendResponse(os, "400", "Os campos token e o objeto usuario com senha sao obrigatorios.", null);
             return;
         }
         String nomeUsuario = validarTokenEObterNomeUsuario(req.get("token").getAsString());
@@ -256,11 +269,14 @@ public class EchoServerTCP_Server {
             return;
         }
         String novaSenha = req.getAsJsonObject("usuario").get("senha").getAsString();
-        if (novaSenha.trim().isEmpty()) {
-            sendResponse(os, "422", "A nova senha não pode ser vazia.", null);
+
+        if (novaSenha.length() < 3 || novaSenha.length()>20 || novaSenha.trim().isEmpty()) {
+            sendResponse(os, "405", "Senha invalida. deve ter de 3 e 20 caracteres", null);
             return;
         }
+
         EntityManager em = JpaUtil.getEntityManager();
+
         try {
             em.getTransaction().begin();
             TypedQuery<Usuario> query = em.createQuery("SELECT u FROM Usuario u WHERE u.nome = :nome", Usuario.class);
@@ -279,12 +295,12 @@ public class EchoServerTCP_Server {
 
     private static void handleDeleteUser(JsonObject req, PrintStream os) {
         if (!req.has("token")) {
-            sendResponse(os, "400", "O campo 'token' e obrigatorio.", null);
+            sendResponse(os, "422", "O campo 'token' e obrigatorio.", null);
             return;
         }
         String nomeUsuario = validarTokenEObterNomeUsuario(req.get("token").getAsString());
         if (nomeUsuario == null) {
-            sendResponse(os, "401", "Token invalido ou expirado.", null);
+            sendResponse(os, "401", "Token invalido.", null);
             return;
         }
         EntityManager em = JpaUtil.getEntityManager();

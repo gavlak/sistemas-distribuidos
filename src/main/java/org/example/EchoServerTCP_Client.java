@@ -33,8 +33,10 @@ public class EchoServerTCP_Client {
 
             System.out.println("Conectado!");
 
-            while (true) {
-                System.out.print("\nDigite a operacao (CRIAR USUARIO, LOGIN , LOGOUT, EDITAR PROPRIO USUARIO, EXCLUIR PROPRIO USUARIO), LISTAR PROPRIO USUARIO: ");
+            boolean continuarExecutando = true;
+
+            while (continuarExecutando) {
+                System.out.print("\nCRIAR USUARIO, LOGIN , LOGOUT, EDITAR PROPRIO USUARIO, EXCLUIR PROPRIO USUARIO, LISTAR PROPRIO USUARIO:");
                 String operacao = teclado.readLine().toUpperCase().replace(" ", "_");
                 System.out.println(operacao);
                 String jsonParaEnviar;
@@ -70,7 +72,8 @@ public class EchoServerTCP_Client {
                         break;
 
                     case "LISTAR_PROPRIO_USUARIO":
-                        if(tokenAtual == null) {
+                        // if(tokenAtual == null) { //
+                        if(tokenAtual.getValor() == null) { // <-- MODIFICADO
                             System.out.println("ERRO: Você precisa fazer login antes de realizar esta operacao.");
                             continue;
                         }
@@ -82,11 +85,11 @@ public class EchoServerTCP_Client {
                         break;
 
                     case "EDITAR_PROPRIO_USUARIO":
-                        if (tokenAtual == null) {
+                        // if (tokenAtual == null) { //
+                        if (tokenAtual.getValor() == null) { // <-- MODIFICADO
                             System.out.println("ERRO: Você precisa fazer login antes de realizar esta operacao.");
                             continue;
                         }
-
                         System.out.print("Digite a nova senha: ");
                         String senhaAtualizada = teclado.readLine();
 
@@ -102,7 +105,8 @@ public class EchoServerTCP_Client {
                         break;
 
                     case "EXCLUIR_PROPRIO_USUARIO":
-                        if(tokenAtual == null) {
+                        // if(tokenAtual == null) { //
+                        if(tokenAtual.getValor() == null) { // <-- MODIFICADO
                             System.out.println("ERRO: Voce precisa fazer login antes de realizar esta operacao.");
                             continue;
                         }
@@ -111,25 +115,29 @@ public class EchoServerTCP_Client {
                         requisicaoDelete.addProperty("operacao", operacao);
                         requisicaoDelete.addProperty("token", tokenAtual.getValor());
                         jsonParaEnviar = gson.toJson(requisicaoDelete);
-                        return;
+                        // out.println(jsonParaEnviar); // <-- MODIFICADO: Removido daqui
+                        continuarExecutando = false;   // <-- MODIFICADO: Em vez de 'return'
+                        break;                         // <-- MODIFICADO: Adicionado 'break'
 
                     case "LOGOUT":
                         System.out.println("Encerrando conexão e fazendo logout...");
                         JsonObject requisicaoLogout = new JsonObject();
                         requisicaoLogout.addProperty("operacao", operacao);
 
-                        if (tokenAtual != null) {
+                        // if (tokenAtual != null) { //
+                        if (tokenAtual.getValor() != null) { // <-- MODIFICADO
                             requisicaoLogout.addProperty("token", tokenAtual.getValor());
                         }
 
-                        out.println(gson.toJson(requisicaoLogout));
-                        return;
+                        jsonParaEnviar = gson.toJson(requisicaoLogout); // <-- MODIFICADO: Atribui à variável
+                        // out.println(gson.toJson(requisicaoLogout)); // <-- MODIFICADO: Removido daqui
+                        continuarExecutando = false; // <-- MODIFICADO: Em vez de 'return'
+                        break;
 
                     default:
                         System.out.println("operacao invalida. Tente novamente.");
                         continue;
                 }
-
 
                 System.out.println("\n[CLIENTE -> SERVIDOR]");
                 System.out.println(jsonParaEnviar);
